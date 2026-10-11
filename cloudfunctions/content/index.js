@@ -25,8 +25,9 @@
  *   hero      首屏主标题 / 副标题 / 按钮文字
  *   about     两段自我介绍
  *   skills    技能标签列表
- *   spaces    自建空间列表：每个空间有名字 + 可选短名（slug）+ 可选外链（externalUrl），
- *             内含若干「文字块 / 图片块」。填了外链就点格子直接跳到那个网址。
+ *   spaces    自建空间列表：每个空间有名字 + 可选短名（slug），内含若干「文字块 / 图片块」
+ *   links     「好东西」：站外的网址收藏，可以放自己的其他 web 作品或欣赏的站点。
+ *             每条 = 名字 + 网址 + 一句话说明（说明可留空）
  *   contact   联系区引导语 + 邮箱 + GitHub（页脚的两个图标也用这两个值）
  *   footer    页脚一行小字
  *
@@ -56,6 +57,7 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_SPACES = 12;
 const MAX_BLOCKS_PER_SPACE = 30;
+const MAX_LINKS = 24;
 
 /** 白名单而不是黑名单：只收这几种能安全内联展示的位图，
  *  SVG 坚决不收——它是 XML，里面能塞脚本。 */
@@ -66,7 +68,7 @@ const IMAGE_TYPES = {
     'image/webp': 'webp'
 };
 
-const SECTION_KEYS = ['hero', 'about', 'skills', 'spaces', 'contact', 'footer'];
+const SECTION_KEYS = ['hero', 'about', 'skills', 'spaces', 'links', 'contact', 'footer'];
 
 /* ------------------------------------------------------------------ */
 /* HTTP 外壳                                                            */
@@ -204,17 +206,9 @@ const NORMALIZERS = {
                 return { type: 'text', value: within(text(block.value), 2000, `${label}文字`, errors) };
             });
 
-            // 外链：填了之后格子上点一下直接跳走，用来挂自己别的站点或喜欢的网页。
-            // 既然会渲染成 href，这里必须卡死只允许 http(s)——否则 javascript: 就能被点起来
-            const external = text(source.externalUrl);
-            if (external && !/^https?:\/\/\S+$/i.test(external)) {
-                errors[at('外链地址')] = `${at('外链地址')}必须是 http(s) 开头的网址`;
-            }
-
             return {
                 name: within(text(source.name), 40, at('名字'), errors),
                 slug: slugify(source.slug),
-                externalUrl: within(external, 300, at('外链地址'), errors),
                 blocks
             };
         });
@@ -229,6 +223,39 @@ const NORMALIZERS = {
                 return;
             }
             seen.set(space.slug, index);
+        });
+
+        return { items };
+    },
+
+    /**
+     * 「好东西」：站外网址收藏。
+     * 网址会渲染成 href，所以只放行 http(s)——否则 javascript: 伪协议能被点起来。
+     * 网址是必填的：没有网址的一条挂在首页上只会是个点不动的格子。
+     */
+    links(raw, errors) {
+        const rawItems = Array.isArray(raw.items) ? raw.items : [];
+        if (rawItems.length > MAX_LINKS) {
+            errors.items = `最多 ${MAX_LINKS} 条好东西`;
+            return { items: [] };
+        }
+
+        const items = rawItems.map((rawLink, index) => {
+            const source = rawLink && typeof rawLink === 'object' ? rawLink : {};
+            const at = (name) => `第 ${index + 1} 条好东西的${name}`;
+
+            const url = within(text(source.url), 300, at('网址'), errors);
+            if (!url) {
+                errors[at('网址')] = `${at('网址')}不能为空`;
+            } else if (!/^https?:\/\/\S+$/i.test(url)) {
+                errors[at('网址')] = `${at('网址')}必须是 http(s) 开头的网址`;
+            }
+
+            return {
+                name: within(text(source.name), 40, at('名字'), errors),
+                url,
+                note: within(text(source.note), 120, at('说明'), errors)
+            };
         });
 
         return { items };

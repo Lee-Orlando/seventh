@@ -513,14 +513,6 @@
                 fields: [
                     { name: 'name', label: '空间名字', max: 40, placeholder: '例如：读书笔记 / 摄影 / 项目记录' },
                     {
-                        name: 'externalUrl',
-                        label: '外链地址（选填）',
-                        max: 300,
-                        url: true,
-                        placeholder: 'https://example.com',
-                        hint: '填了之后，首页格子上点一下就直接跳到这个网址——适合放你自己的其他 web 作品，或者你欣赏的站点。留空就照常打开这个空间自己的页面。'
-                    },
-                    {
                         name: 'slug',
                         label: '链接短名',
                         max: 32,
@@ -531,6 +523,26 @@
                 ],
                 // 每个空间除了这些字段，还能往下塞文字块和图片块
                 blocks: true
+            }
+        },
+        {
+            key: 'links',
+            label: '好东西',
+            list: {
+                label: '好东西',
+                maxItems: 24,
+                fields: [
+                    { name: 'name', label: '名字', max: 40, placeholder: '例如：我的另一个作品 / 一个很酷的网站' },
+                    {
+                        name: 'url',
+                        label: '网址',
+                        max: 300,
+                        url: true,
+                        placeholder: 'https://example.com',
+                        hint: '只认 http(s) 开头的地址。这是站外链接，会在新标签页打开。'
+                    },
+                    { name: 'note', label: '一句话说明（选填）', max: 120, placeholder: '例如：配色参考做得很好' }
+                ]
             }
         },
         {
@@ -743,23 +755,11 @@
     function renderSpaceCard(space, index) {
         const blocks = (space && space.blocks) || [];
         const name = String((space && space.name) || '').trim() || '未命名空间';
-        // 填了外链就跳外链，否则打开这个空间自己的页面
-        const external = /^https?:\/\/\S+$/i.test(String((space && space.externalUrl) || '').trim())
-            ? String(space.externalUrl).trim()
-            : '';
 
         const card = document.createElement('a');
         card.className = 'space-card';
-        if (external) {
-            card.href = external;
-            card.target = '_blank';
-            card.rel = 'noopener noreferrer';
-            card.classList.add('is-external');
-            card.setAttribute('aria-label', `在新标签页打开外链：${name}`);
-        } else {
-            card.href = spaceHref(space, index || 0);
-            card.setAttribute('aria-label', `打开空间：${name}`);
-        }
+        card.href = spaceHref(space, index || 0);
+        card.setAttribute('aria-label', `打开空间：${name}`);
 
         const cover = blocks.find((block) => block && block.type === 'image' && safeUrl(block.url));
         if (cover) {
@@ -791,8 +791,43 @@
 
         const cue = document.createElement('span');
         cue.className = 'space-cue';
-        // 外链把目标域名写在格子上，点之前就知道会跳到哪儿去
-        cue.textContent = external ? `${hostOf(external)} ↗` : '进入 →';
+        cue.textContent = '进入 →';
+        card.appendChild(cue);
+
+        return card;
+    }
+
+    /**
+     * 「好东西」里的一格：整块是外链，新标签页打开。
+     * 格子上写目标域名——点之前就该知道会跳到别的站，别让人以为是站内页面。
+     */
+    function renderLinkCard(link) {
+        const url = safeUrl(link && link.url);
+        const name = String((link && link.name) || '').trim() || (url ? hostOf(url) : '未命名');
+
+        const card = document.createElement('a');
+        card.className = 'link-card';
+        card.href = url || '#';
+        card.target = '_blank';
+        card.rel = 'noopener noreferrer';
+        card.setAttribute('aria-label', `在新标签页打开：${name}`);
+
+        const title = document.createElement('h3');
+        title.className = 'link-title';
+        title.textContent = name;
+        card.appendChild(title);
+
+        const note = String((link && link.note) || '').trim();
+        if (note) {
+            const excerpt = document.createElement('p');
+            excerpt.className = 'link-note';
+            excerpt.textContent = note;
+            card.appendChild(excerpt);
+        }
+
+        const cue = document.createElement('span');
+        cue.className = 'space-cue is-external';
+        cue.textContent = `${hostOf(url)} ↗`;
         card.appendChild(cue);
 
         return card;
@@ -807,9 +842,9 @@
         }
     }
 
-    /** 一个空间都没有时，整块收起来，别留一片空白 Section */
-    function toggleSpacesSection(items) {
-        const host = document.getElementById('spaces');
+    /** 一条内容都没有时，整块收起来，别留一片空白 Section */
+    function toggleListSection(key, items) {
+        const host = document.getElementById(key);
         if (host) host.hidden = !(items && items.length);
     }
 
@@ -824,9 +859,10 @@
         if (section.list) {
             // 云端返回空数组时要尊重它：管理员可能真的把空间全删了
             const items = Array.isArray(source.items) ? source.items : fallback.items;
+            const render = key === 'links' ? renderLinkCard : renderSpaceCard;
             root.textContent = '';
-            items.forEach((item, index) => root.appendChild(renderSpaceCard(item, index)));
-            toggleSpacesSection(items);
+            items.forEach((item, index) => root.appendChild(render(item, index)));
+            toggleListSection(key, items);
             return;
         }
 
@@ -1143,7 +1179,7 @@
         function addListItem(section) {
             const items = draft[section.key].items;
             if (items.length >= section.list.maxItems) {
-                setStatus(section.key, `最多 ${section.list.maxItems} 个空间，先删一个再加。`, 'error');
+                setStatus(section.key, `最多 ${section.list.maxItems} 个${section.list.label}，先删一个再加。`, 'error');
                 return;
             }
             items.push(emptyItem(section));
@@ -1419,7 +1455,7 @@
 
                 const order = document.createElement('span');
                 order.className = 'item-index';
-                order.textContent = `${index + 1}. ${item.name || '未命名空间'}`;
+                order.textContent = `${index + 1}. ${item.name || `未命名${section.list.label}`}`;
 
                 const controls = document.createElement('div');
                 controls.className = 'item-controls';
@@ -1475,7 +1511,7 @@
         }
 
         function removeListItem(section, index) {
-            const name = draft[section.key].items[index].name || '这个空间';
+            const name = draft[section.key].items[index].name || `这个${section.list.label}`;
             if (!window.confirm(`删除「${name}」？里面的内容一起删掉。`)) return;
             draft[section.key].items.splice(index, 1);
             renderItemEditor(section);

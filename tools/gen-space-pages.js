@@ -55,11 +55,7 @@ function pageHtml(space) {
     const slug = slugify(space.slug);
     const name = String(space.name || '').trim() || '未命名空间';
     const description = firstText(space.blocks);
-    // 外链空间就直接跳到那个网址，没必要绕一圈内页
-    const external = /^https?:\/\/\S+$/i.test(String(space.externalUrl || '').trim())
-        ? String(space.externalUrl).trim()
-        : '';
-    const target = external || `../../space.html?space=${encodeURIComponent(slug)}`;
+    const target = `../../space.html?space=${encodeURIComponent(slug)}`;
 
     return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -113,8 +109,7 @@ async function main() {
         const dir = path.join(OUT_DIR, slug);
         fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(path.join(dir, 'index.html'), pageHtml(space), 'utf8');
-        const goal = /^https?:\/\/\S+$/i.test(String(space.externalUrl || '').trim()) ? '跳转外链' : '跳转空间页';
-        console.log(`  space/${slug}/index.html  →  ${String(space.name || '').trim() || '未命名空间'}（${goal}）`);
+        console.log(`  space/${slug}/index.html  →  ${String(space.name || '').trim() || '未命名空间'}`);
     });
 
     console.log(`\n生成了 ${named.length} 个短链页面，部署时记得把 space/ 目录一起传上去。`);

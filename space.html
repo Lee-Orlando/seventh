@@ -49,6 +49,29 @@
                 <h1 class="space-detail-title" id="spaceTitle">正在加载…</h1>
                 <div class="space-detail-body" id="spaceBody"></div>
 
+                <!-- 这个页面自带一套编辑器，跟首页右侧那个抽屉面板是两回事：
+                     首页的抽屉管整站文案和空间清单，这里只改当前这一个空间的名字、文字和图片。
+                     之所以分开，是因为站在这里改内容时，眼睛看到的排版就是访客看到的排版，
+                     不用在抽屉里想象它长什么样。 -->
+                <!-- 状态条放在编辑器外面：保存成功后编辑器会收起来，提示得留得住 -->
+                <p class="editor-status" id="editorStatus" role="status" aria-live="polite" hidden></p>
+
+                <div class="space-editor" id="spaceEditor" hidden>
+                    <p class="editor-hint">只改这个空间。改完点保存，访客刷新就能看到。</p>
+
+                    <div class="form-group">
+                        <label for="editName">空间名字</label>
+                        <input type="text" id="editName" maxlength="40" autocomplete="off">
+                    </div>
+
+                    <div id="editBlocks"></div>
+
+                    <div class="editor-actions">
+                        <button type="button" class="submit-button" id="editSave">保存这个空间</button>
+                        <button type="button" class="ghost-button" id="editCancel">取消</button>
+                    </div>
+                </div>
+
                 <p class="space-notice" id="spaceNotice" hidden></p>
             </div>
         </section>
@@ -73,16 +96,15 @@
         </div>
     </noscript>
 
-    <!-- 管理入口：空间详情页本身不承担编辑——整站只有一个编辑器，在首页右侧抽屉里。
-         这里只负责把人送过去，并带上当前空间的短名，好让首页直接定位到那一条。
-         默认 href 指向 index.html#edit，没 JS 时也能进管理面板（只是定位不到具体空间）。 -->
-    <a class="admin-fab" href="index.html#edit" id="adminFab">
+    <!-- 编辑入口：就地打开本页的编辑器，不跳回首页。
+         默认隐藏——内容还没从云端取回来之前，开了编辑器也不知道在改什么。 -->
+    <button type="button" class="admin-fab" id="adminFab" hidden>
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
             <path d="M12 20h9"></path>
             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
         </svg>
-        <span>编辑这个空间</span>
-    </a>
+        <span id="adminFabLabel">编辑这个空间</span>
+    </button>
 
     <script src="site.config.js" defer></script>
     <script src="js/space.js" defer></script>
