@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>空间 · Lyq</title>
+
+    <meta name="description" content="Lyq 个人站点里的一个空间。">
+    <meta name="author" content="Lyq">
+    <meta name="theme-color" content="#0a0a0a">
+
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="空间 · Lyq">
+    <meta property="og:description" content="Lyq 个人站点里的一个空间。">
+    <meta property="og:image" content="og-image.svg">
+    <meta name="twitter:card" content="summary">
+
+    <!-- 内容接口：真实地址在 site.config.js（被 gitignore），这里留空只作兜底 -->
+    <meta name="content-endpoint" content="">
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230a0a0a'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='36' font-weight='700' fill='%23FFD700' text-anchor='middle'%3EL%3C/text%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+
+    <header id="mainHeader" class="main-header">
+        <div class="container">
+            <a href="index.html" class="logo">Lyq</a>
+            <nav class="main-nav" aria-label="主导航">
+                <ul>
+                    <li><a href="index.html#hero">首页</a></li>
+                    <li><a href="index.html#about">关于</a></li>
+                    <li><a href="index.html#contact">联系</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main id="main">
+        <!-- 内容全部来自云端，所以这里只有骨架：标题、正文、以及三种状态提示。
+             哪个是哪个由 js/space.js 决定，找不到空间时会把正文收起来、只留提示。 -->
+        <section class="space-detail section" id="spaceDetail">
+            <div class="container">
+                <a class="back-link" href="index.html#spaces">← 返回全部空间</a>
+
+                <h1 class="space-detail-title" id="spaceTitle">正在加载…</h1>
+                <div class="space-detail-body" id="spaceBody"></div>
+
+                <p class="space-notice" id="spaceNotice" hidden></p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="main-footer">
+        <div class="container">
+            <div class="footer-copyright">
+                <p>&copy; <span id="copyright-year"></span> Lyq. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 空间内容存在云端，禁用 JS 时这里什么都拿不到。
+         如实说明并把人送回首页，而不是留一个看起来像坏了的页面。 -->
+    <noscript>
+        <style>
+            .space-detail-title { display: none; }
+        </style>
+        <div class="container">
+            <p class="space-notice">这个页面的内容需要从云端读取，请开启 JavaScript，或<a href="index.html">回到首页</a>。</p>
+        </div>
+    </noscript>
+
+    <script src="site.config.js" defer></script>
+    <script src="js/space.js" defer></script>
+</body>
+</html>

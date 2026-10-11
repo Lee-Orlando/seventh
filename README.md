@@ -41,7 +41,9 @@ npx serve .
 
 ```
 seventh-main/
-├── index.html                  # 唯一页面入口，单页多 section（含静态默认内容）
+├── index.html                  # 首页：单页多 section（含静态默认内容），空间是九宫格
+├── space.html                  # 单个空间的页面，按 ?space=短名 读云端渲染
+├── tools/gen-space-pages.js    # 给设了短名的空间生成 space/<短名>/index.html 跳转页
 ├── 404.html                    # 静态托管自定义错误页
 ├── favicon.svg                 # 站点图标
 ├── og-image.svg                # 社交分享预览图（上线前建议换成 PNG）
@@ -53,7 +55,8 @@ seventh-main/
 ├── sitemap.example.xml         # sitemap.xml 的模板
 ├── cloudbaserc.json            # CloudBase CLI 部署配置（含环境 ID，不进版本库）
 ├── css/styles.css              # 全部样式，含响应式与无障碍规则
-├── js/main.js                  # 交互逻辑，IIFE 封装，零全局变量
+├── js/main.js                  # 首页交互逻辑，IIFE 封装，零全局变量
+├── js/space.js                 # space.html 的逻辑：只负责取一个空间并渲染
 └── cloudfunctions/
     ├── contact/                # 联系表单云函数：留言按月归档到云存储
     │   ├── index.js
@@ -155,6 +158,7 @@ POST /content            { section, content }  写单个区块
   "items": [
     {
       "name": "我的摄影",
+      "slug": "photos",
       "blocks": [
         { "type": "text",  "value": "一段文字，最多 2000 字" },
         { "type": "image", "url": "https://…/photo.png", "alt": "显示在图下方的说明" }
@@ -165,6 +169,24 @@ POST /content            { section, content }  写单个区块
 ```
 
 图片不塞进这个 JSON——base64 会让体积膨胀三分之一，内容文件迟早被撑爆，页面加载跟着变慢。
+
+### 空间的两种网址
+
+首页的九宫格里，每一格都是链接，点进去是这个空间自己的页面：
+
+| | 网址 | 怎么来的 | 特点 |
+|---|---|---|---|
+| **主链接** | `space.html?space=photos` | 自动就有 | 读云端，永远是最新的；新建空间不用重新部署 |
+| **短链（可选）** | `space/photos/` | 跑一次 `node tools/gen-space-pages.js` | 网址干净，且微信/爬虫能抓到**这个空间自己的标题和摘要** |
+
+短链是一个只做跳转的静态页（写好 og 标签后跳回主链接），所以它有两个代价：
+改了空间名或摘要后 og 会过期，需要重跑脚本再部署；**但短链不存在也不影响任何功能**，
+它只是多一个入口。
+
+`slug` 就是上面 JSON 里的「链接短名」：只能有小写字母、数字和连字符，前后端用同一套规则收敛
+（改一处要改另一处：`js/main.js` 的 `slugify` 和 `cloudfunctions/content/index.js` 的 `slugify`）。
+留空不报错，网址回退成 `s1`、`s2` 这种序号——能用，但**空间一改名旧链接就失效**，所以建议填上。
+两个空间填了同一个短名会被服务端拒绝。
 
 ### 上传图片
 
@@ -257,6 +279,12 @@ tcb hosting deploy ./ -e <你的环境ID> --exclude "cloudfunctions/**" "cloudba
 CloudBase 会返回一个默认域名（形如 `xxx.tcloudbaseapp.com`），填回 `site.config.js` 的
 `siteUrl`，并同步进 `robots.txt` 和 `sitemap.xml`（模板分别是 `robots.example.txt` /
 `sitemap.example.xml`，把里面的占位域名换成自己的即可）。
+
+想要空间的短链（`space/photos/` 这种），在部署前多跑一步：
+
+```bash
+node tools/gen-space-pages.js   # 生成 space/<短名>/index.html，记得一起部署
+```
 
 > 绑定自己的域名需要 ICP 备案。未备案时直接用 CloudBase 默认域名即可正常访问和被收录。
 

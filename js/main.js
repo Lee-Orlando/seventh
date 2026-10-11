@@ -511,7 +511,15 @@
                 label: '空间',
                 maxItems: 12,
                 fields: [
-                    { name: 'name', label: '空间名字', max: 40, placeholder: '例如：读书笔记 / 摄影 / 项目记录' }
+                    { name: 'name', label: '空间名字', max: 40, placeholder: '例如：读书笔记 / 摄影 / 项目记录' },
+                    {
+                        name: 'slug',
+                        label: '链接短名',
+                        max: 32,
+                        placeholder: 'notes',
+                        hint: '只能用小写字母、数字和连字符，决定这个空间的网址。留空就按序号排（s1、s2），但改名后旧链接会失效。',
+                        preview: true
+                    }
                 ],
                 // 每个空间除了这些字段，还能往下塞文字块和图片块
                 blocks: true
@@ -567,6 +575,32 @@
     function safeUrl(value) {
         const url = String(value || '').trim();
         return /^https?:\/\/\S+$/i.test(url) ? url : '';
+    }
+
+    /* ---- 空间的链接 ---- */
+
+    /**
+     * 链接短名：只留小写字母、数字和连字符，其余字符折成连字符。
+     * 与云函数 content/index.js 里的 slugify 是同一套规则，改一处就要改另一处。
+     * 留空不报错，退回按序号生成的 s1 / s2 —— 但那种链接改名后会失效。
+     */
+    function slugify(value) {
+        const raw = String(value || '').trim().toLowerCase();
+        if (!raw) return '';
+        return raw
+            .replace(/[^a-z0-9-]+/g, '-')
+            .replace(/-{2,}/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 32);
+    }
+
+    /** 空间在列表里的第几位决定兜底短名，space.html 认这个格式 */
+    function spaceSlug(space, index) {
+        return slugify(space && space.slug) || `s${index + 1}`;
+    }
+
+    function spaceHref(space, index) {
+        return `space.html?space=${encodeURIComponent(spaceSlug(space, index))}`;
     }
 
     function emptyData(section) {
@@ -693,22 +727,51 @@
         return figure;
     }
 
-    function renderSpaceCard(space) {
-        const card = document.createElement('article');
-        card.className = 'space-card';
+    /**
+     * 九宫格里的一格：整块是链接，点进去是这个空间自己的页面。
+     * 格子里只放封面图、名字和一句摘要——完整内容在 space.html 里展开，
+     * 否则格子高矮不一，网格会散。
+     */
+    function renderSpaceCard(space, index) {
+        const blocks = (space && space.blocks) || [];
 
-        const name = String((space && space.name) || '').trim();
-        if (name) {
-            const title = document.createElement('h3');
-            title.className = 'space-title';
-            title.textContent = name;
-            card.appendChild(title);
+        const card = document.createElement('a');
+        card.className = 'space-card';
+        card.href = spaceHref(space, index || 0);
+        card.setAttribute('aria-label', `打开空间：${String((space && space.name) || '未命名空间').trim()}`);
+
+        const cover = blocks.find((block) => block && block.type === 'image' && safeUrl(block.url));
+        if (cover) {
+            const wrap = document.createElement('div');
+            wrap.className = 'space-cover';
+
+            const img = document.createElement('img');
+            img.src = safeUrl(cover.url);
+            img.alt = String(cover.alt || '');
+            img.loading = 'lazy';
+            img.decoding = 'async';
+            wrap.appendChild(img);
+            card.appendChild(wrap);
         }
 
-        (space.blocks || []).forEach((block) => {
-            const node = block && block.type === 'image' ? renderImageBlock(block) : renderTextBlock(block);
-            if (node) card.appendChild(node);
-        });
+        const title = document.createElement('h3');
+        title.className = 'space-title';
+        title.textContent = String((space && space.name) || '').trim() || '未命名空间';
+        card.appendChild(title);
+
+        const firstText = blocks.find((block) => block && block.type === 'text' && String(block.value || '').trim());
+        if (firstText) {
+            const excerpt = document.createElement('p');
+            excerpt.className = 'space-excerpt';
+            const value = String(firstText.value).trim().replace(/\s+/g, ' ');
+            excerpt.textContent = value.length > 60 ? `${value.slice(0, 60)}…` : value;
+            card.appendChild(excerpt);
+        }
+
+        const cue = document.createElement('span');
+        cue.className = 'space-cue';
+        cue.textContent = '进入 →';
+        card.appendChild(cue);
 
         return card;
     }
@@ -731,7 +794,7 @@
             // 云端返回空数组时要尊重它：管理员可能真的把空间全删了
             const items = Array.isArray(source.items) ? source.items : fallback.items;
             root.textContent = '';
-            items.forEach((item) => root.appendChild(renderSpaceCard(item)));
+            items.forEach((item, index) => root.appendChild(renderSpaceCard(item, index)));
             toggleSpacesSection(items);
             return;
         }
@@ -923,7 +986,26 @@
                 group.appendChild(tip);
             }
 
+            // 短名这类字段要把「最终会变成什么网址」直接摊开给用户看，
+            // 免得填完不知道自己拿到了哪个链接
+            if (field.preview) {
+                const preview = document.createElement('span');
+                preview.className = 'field-hint is-link';
+                preview.setAttribute('data-slug-preview', field.name);
+                group.appendChild(preview);
+            }
+
             return group;
+        }
+
+        function refreshSlugPreview(card, index) {
+            const node = card?.querySelector('[data-slug-preview]');
+            if (!node) return;
+            const input = card.querySelector('[data-field="slug"]');
+            const slug = slugify(input ? input.value : '');
+            node.textContent = slug
+                ? `这个空间的网址：space.html?space=${slug}`
+                : `还没填短名，网址会按序号排成 s${index + 1}`;
         }
 
         function fillPane(key) {
@@ -1341,6 +1423,7 @@
                 section.list.fields.forEach((field) => {
                     card.appendChild(createFieldControl(field, item[field.name]));
                 });
+                refreshSlugPreview(card, index);
 
                 if (section.list.blocks) {
                     item.blocks = Array.isArray(item.blocks) ? item.blocks : [];
@@ -1403,6 +1486,13 @@
                 const target = draft[key].items[index];
                 if (!field || !target) return;
                 target[field.name] = collectInput(section, field, input);
+                // 短名当场收敛成合法值：草稿里存的就是最终会写进云端的那个，
+                // 不然服务端改了、前端还显示原样，两边对不上
+                if (field.name === 'slug') target.slug = slugify(target.slug);
+                // 卡片标题和链接预览都跟着变，但不重绘整张卡——重绘会抢走输入焦点
+                const heading = itemCard.querySelector('.item-index');
+                if (heading) heading.textContent = `${index + 1}. ${target.name || '未命名空间'}`;
+                if (field.name === 'slug') refreshSlugPreview(itemCard, index);
             } else {
                 const field = section.fields.find((f) => f.name === input.getAttribute('data-field'));
                 if (!field) return;
@@ -1414,6 +1504,26 @@
 
         // 选文件的 input 不触发 'input'，单独监听 'change'
         form.addEventListener('change', (event) => {
+            // 短名输入框失焦时把内容收敛成最终形态，让用户看见自己到底拿到了什么
+            const slugInput = event.target.closest('[data-field="slug"]');
+            if (slugInput) {
+                const cleaned = slugify(slugInput.value);
+                slugInput.value = cleaned;
+                const card = slugInput.closest('[data-item]');
+                const pane = slugInput.closest('[data-pane]');
+                const section = pane ? sectionByKey(pane.getAttribute('data-pane')) : null;
+                if (card && section && draft) {
+                    const index = Number(card.getAttribute('data-item'));
+                    const target = draft[section.key] && draft[section.key].items[index];
+                    if (target) {
+                        target.slug = cleaned;
+                        refreshSlugPreview(card, index);
+                        markDirty(section.key);
+                    }
+                }
+                return;
+            }
+
             const picker = event.target.closest('[data-block-file]');
             const pane = picker?.closest('[data-pane]');
             if (!picker || !pane) return;

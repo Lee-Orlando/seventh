@@ -25,7 +25,7 @@
  *   hero      首屏主标题 / 副标题 / 按钮文字
  *   about     两段自我介绍
  *   skills    技能标签列表
- *   spaces    自建空间列表：每个空间有名字，内含若干「文字块 / 图片块」
+ *   spaces    自建空间列表：每个空间有名字 + 可选的链接短名（slug），内含若干「文字块 / 图片块」
  *   contact   联系区引导语 + 邮箱 + GitHub（页脚的两个图标也用这两个值）
  *   footer    页脚一行小字
  *
@@ -205,8 +205,21 @@ const NORMALIZERS = {
 
             return {
                 name: within(text(source.name), 40, at('名字'), errors),
+                slug: slugify(source.slug),
                 blocks
             };
+        });
+
+        // 两个空间抢同一个短名，链接就会打架，直接拒掉让用户改
+        const seen = new Map();
+        items.forEach((space, index) => {
+            if (!space.slug) return;
+            if (seen.has(space.slug)) {
+                errors[`第 ${index + 1} 个空间的链接`] =
+                    `链接「${space.slug}」已经被第 ${seen.get(space.slug) + 1} 个空间用了`;
+                return;
+            }
+            seen.set(space.slug, index);
         });
 
         return { items };
@@ -238,6 +251,23 @@ function limited(value, name, max, errors) {
 function within(value, max, label, errors) {
     if (value.length > max) errors[label] = `${label} 不能超过 ${max} 个字`;
     return value;
+}
+
+/**
+ * 空间的链接短名：只留小写字母、数字和连字符，其余一律换成连字符。
+ *
+ * 这里不报错、只做收敛——用户填「读书笔记」这种中文名也能落成一个安全的值，
+ * 而不是把整次保存驳回。前端用同一套规则预处理，两边结果一致。
+ * 短名可以为空，前端会退回按序号生成的 s1 / s2。
+ */
+function slugify(value) {
+    const raw = text(value).toLowerCase();
+    if (!raw) return '';
+    return raw
+        .replace(/[^a-z0-9-]+/g, '-')
+        .replace(/-{2,}/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 32);
 }
 
 /** 列表字段：既限制条目数，也限制每条的长度 */

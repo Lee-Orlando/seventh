@@ -22,3 +22,6 @@ sitemap.xml
 .idea/
 .vscode/
 *.swp
+
+# 生成的短链跳转页：内容随云端变化，不进版本库（想保留就去掉这行）
+space/

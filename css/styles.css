@@ -366,6 +366,14 @@ section[id] {
     color: #8b8b8b;
 }
 
+/* 链接预览：把最终网址摊开，用等宽字体避免 l / 1 看混 */
+.field-hint.is-link {
+    margin-top: 4px;
+    color: var(--gold);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    word-break: break-all;
+}
+
 .editor-actions {
     display: flex;
     flex-wrap: wrap;
@@ -402,24 +410,68 @@ section[id] {
 
 /* ---------- 自建空间 ---------- */
 
-/* 空间是一竖列：每个空间一张卡，卡片里按「文字块 / 图片块」的顺序往下排。
-   不做成网格，是因为卡片高度差太大，网格会让短卡片下面留出空洞。 */
+/* 空间是九宫格：桌面三列、平板两列、手机一列。
+   一格只放封面 + 名字 + 一句摘要，完整内容点进去单独看——
+   否则卡片高矮差太多，网格会被撑得东倒西歪。 */
 .spaces-list {
-    display: flex;
-    flex-direction: column;
-    gap: 28px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
 }
 
+/* 整格都是链接，所以这里直接用 a 标签承载，不再嵌套 article */
 .space-card {
-    padding: 30px 28px;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
     background: var(--dark-gray);
     border: 1px solid rgba(255, 215, 0, 0.2);
     border-radius: 10px;
+    overflow: hidden;
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.space-card:hover,
+.space-card:focus-visible {
+    transform: translateY(-4px);
+    border-color: rgba(255, 215, 0, 0.55);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+    outline: none;
+}
+
+/* 封面统一裁成 16:10，有没有图都不会让格子高度失控 */
+.space-cover {
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background: #141414;
+}
+
+.space-cover img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .space-title {
-    font-size: 1.5rem;
-    margin-bottom: 16px;
+    font-size: 1.1rem;
+    margin: 16px 16px 6px;
+}
+
+.space-excerpt {
+    flex: 1;
+    margin: 0 16px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: #9a9a9a;
+}
+
+.space-cue {
+    margin: 12px 16px 16px;
+    font-size: 0.85rem;
+    color: var(--gold);
 }
 
 .space-text {
@@ -457,6 +509,48 @@ section[id] {
     font-size: 0.85rem;
     color: #9a9a9a;
     text-align: center;
+}
+
+/* ---------- 单个空间的详情页（space.html） ---------- */
+
+/* 详情页回归单列长文：这里要读完整内容，不再受九宫格的高度约束 */
+.space-detail .container {
+    max-width: 760px;
+}
+
+.back-link {
+    display: inline-block;
+    margin-bottom: 22px;
+    font-size: 0.9rem;
+    color: var(--gold);
+    text-decoration: none;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+    text-decoration: underline;
+}
+
+.space-detail-title {
+    font-size: 2rem;
+    margin-bottom: 24px;
+}
+
+.space-detail-body .space-text {
+    font-size: 1.05rem;
+}
+
+/* 三种失败状态共用一块提示：没配接口 / 链接没带短名 / 空间不存在 */
+.space-notice {
+    padding: 20px 22px;
+    background: var(--dark-gray);
+    border: 1px solid rgba(255, 215, 0, 0.2);
+    border-radius: 10px;
+    line-height: 1.7;
+}
+
+.space-notice a {
+    color: var(--gold);
 }
 
 /* ---------- 管理面板 ---------- */
@@ -761,8 +855,15 @@ section[id] {
         padding: 20px 18px 40px;
     }
 
-    .space-card {
-        padding: 22px 18px;
+    /* 格子里的内边距已经落在各自元素上，这里只收紧一点 */
+    .space-title {
+        margin: 14px 14px 6px;
+    }
+
+    .space-excerpt,
+    .space-cue {
+        margin-left: 14px;
+        margin-right: 14px;
     }
 }
 
@@ -1041,9 +1142,19 @@ h1, h2, h3, h4 {
     .editor-actions {
         justify-content: center;
     }
+
+    /* 平板两列 */
+    .spaces-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
 }
 
 @media (max-width: 480px) {
+    /* 手机上九宫格会挤成一条，直接单列更可读 */
+    .spaces-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
     .container {
         width: 95%;
     }
