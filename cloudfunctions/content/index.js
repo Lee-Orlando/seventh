@@ -25,7 +25,8 @@
  *   hero      首屏主标题 / 副标题 / 按钮文字
  *   about     两段自我介绍
  *   skills    技能标签列表
- *   spaces    自建空间列表：每个空间有名字 + 可选的链接短名（slug），内含若干「文字块 / 图片块」
+ *   spaces    自建空间列表：每个空间有名字 + 可选短名（slug）+ 可选外链（externalUrl），
+ *             内含若干「文字块 / 图片块」。填了外链就点格子直接跳到那个网址。
  *   contact   联系区引导语 + 邮箱 + GitHub（页脚的两个图标也用这两个值）
  *   footer    页脚一行小字
  *
@@ -203,9 +204,17 @@ const NORMALIZERS = {
                 return { type: 'text', value: within(text(block.value), 2000, `${label}文字`, errors) };
             });
 
+            // 外链：填了之后格子上点一下直接跳走，用来挂自己别的站点或喜欢的网页。
+            // 既然会渲染成 href，这里必须卡死只允许 http(s)——否则 javascript: 就能被点起来
+            const external = text(source.externalUrl);
+            if (external && !/^https?:\/\/\S+$/i.test(external)) {
+                errors[at('外链地址')] = `${at('外链地址')}必须是 http(s) 开头的网址`;
+            }
+
             return {
                 name: within(text(source.name), 40, at('名字'), errors),
                 slug: slugify(source.slug),
+                externalUrl: within(external, 300, at('外链地址'), errors),
                 blocks
             };
         });

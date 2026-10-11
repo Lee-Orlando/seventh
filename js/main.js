@@ -513,6 +513,14 @@
                 fields: [
                     { name: 'name', label: '空间名字', max: 40, placeholder: '例如：读书笔记 / 摄影 / 项目记录' },
                     {
+                        name: 'externalUrl',
+                        label: '外链地址（选填）',
+                        max: 300,
+                        url: true,
+                        placeholder: 'https://example.com',
+                        hint: '填了之后，首页格子上点一下就直接跳到这个网址——适合放你自己的其他 web 作品，或者你欣赏的站点。留空就照常打开这个空间自己的页面。'
+                    },
+                    {
                         name: 'slug',
                         label: '链接短名',
                         max: 32,
@@ -734,11 +742,24 @@
      */
     function renderSpaceCard(space, index) {
         const blocks = (space && space.blocks) || [];
+        const name = String((space && space.name) || '').trim() || '未命名空间';
+        // 填了外链就跳外链，否则打开这个空间自己的页面
+        const external = /^https?:\/\/\S+$/i.test(String((space && space.externalUrl) || '').trim())
+            ? String(space.externalUrl).trim()
+            : '';
 
         const card = document.createElement('a');
         card.className = 'space-card';
-        card.href = spaceHref(space, index || 0);
-        card.setAttribute('aria-label', `打开空间：${String((space && space.name) || '未命名空间').trim()}`);
+        if (external) {
+            card.href = external;
+            card.target = '_blank';
+            card.rel = 'noopener noreferrer';
+            card.classList.add('is-external');
+            card.setAttribute('aria-label', `在新标签页打开外链：${name}`);
+        } else {
+            card.href = spaceHref(space, index || 0);
+            card.setAttribute('aria-label', `打开空间：${name}`);
+        }
 
         const cover = blocks.find((block) => block && block.type === 'image' && safeUrl(block.url));
         if (cover) {
@@ -756,7 +777,7 @@
 
         const title = document.createElement('h3');
         title.className = 'space-title';
-        title.textContent = String((space && space.name) || '').trim() || '未命名空间';
+        title.textContent = name;
         card.appendChild(title);
 
         const firstText = blocks.find((block) => block && block.type === 'text' && String(block.value || '').trim());
@@ -770,10 +791,20 @@
 
         const cue = document.createElement('span');
         cue.className = 'space-cue';
-        cue.textContent = '进入 →';
+        // 外链把目标域名写在格子上，点之前就知道会跳到哪儿去
+        cue.textContent = external ? `${hostOf(external)} ↗` : '进入 →';
         card.appendChild(cue);
 
         return card;
+    }
+
+    /** 只取域名用于展示；解析失败就整条退回，别因为一个奇怪的网址把整页搞崩 */
+    function hostOf(url) {
+        try {
+            return new URL(url).hostname.replace(/^www\./, '');
+        } catch {
+            return '外部链接';
+        }
     }
 
     /** 一个空间都没有时，整块收起来，别留一片空白 Section */
@@ -1658,6 +1689,61 @@
             closePanel();
         });
 
+        /**
+         * 云端内容回来之后，把还开着的面板对应区块刷新一遍。
+         *
+         * 直接用 index.html#edit 进来时，面板往往比云端先就绪，停留在 HTML 的默认值上；
+         * 手动点「管理」按钮则不会遇到（那时云端早就回来了）。两种情况都要正确。
+         * 有未保存改动的区块跳过——不能让用户正在编辑的内容被远端覆盖。
+         */
+        function syncPanesAfterRemote(keys) {
+            keys.forEach((key) => {
+                if (dirty.has(key)) return;
+                draft[key] = clone(published[key]);
+                const section = sectionByKey(key);
+                if (!section) return;
+                if (section.list) renderItemEditor(section);
+                else fillPane(key);
+            });
+        }
+
+        /** 在空间列表里找到驳接进来的那一个：先按短名，再按 s1 / s2 序号 */
+        function indexOfSpace(wanted) {
+            const items = (draft.spaces && draft.spaces.items) || [];
+            const slug = slugify(wanted);
+            if (!slug) return -1;
+
+            const bySlug = items.findIndex((item) => slugify(item && item.slug) === slug);
+            if (bySlug >= 0) return bySlug;
+
+            const asIndex = /^s(\d+)$/.exec(slug);
+            if (asIndex) {
+                const position = Number(asIndex[1]) - 1;
+                if (position >= 0 && position < items.length) return position;
+            }
+            return -1;
+        }
+
+        /** 从空间详情页点「编辑这个空间」过来：直接切到空间标签并把那一条推到眼前 */
+        function focusSpaceEditor(wanted) {
+            const index = indexOfSpace(wanted);
+            if (index < 0) return;
+
+            activateTab('spaces');
+            const card = panes.get('spaces')?.querySelector(`[data-item="${index}"]`);
+            if (!card) return;
+
+            card.classList.add('is-target');
+            // 老浏览器（和 jsdom）不一定实现 smooth，失败就当无事发生
+            try {
+                card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            } catch (error) {
+                /* 不做处理：滚动只是为了看得清，不影响编辑 */
+            }
+            const input = card.querySelector('[data-field="name"]');
+            if (input) input.focus({ preventScroll: true });
+        }
+
         /* ---- 启动 ---- */
 
         buildPanes();
@@ -1667,17 +1753,25 @@
             : '还没配置 content-endpoint，面板只能看不能存：把 site.config.example.js 复制成 site.config.js 并填上云函数地址，或直接用邮件改内容。';
         fab.hidden = false;
 
+        // index.html?space=<短名>#edit：从空间详情页点「编辑这个空间」过来的
+        const pendingSpace = new URLSearchParams(window.location.search).get('space') || '';
         if (window.location.hash === '#edit') openPanel();
+        if (pendingSpace && !panel.hidden) focusSpaceEditor(pendingSpace);
 
         // 云端没连上就保持 HTML 里的静态内容，页面不会白屏，也不谎报成功
         if (endpoint) {
             fetchSections(endpoint).then((remote) => {
                 if (!remote) return;
+                const updated = [];
                 SECTIONS.forEach((section) => {
                     if (!remote[section.key]) return;
                     published[section.key] = remote[section.key];
                     applySection(section.key, published[section.key], defaults);
+                    updated.push(section.key);
                 });
+                if (!panel.hidden) syncPanesAfterRemote(updated);
+                // 面板可能在云端回来之前就开了，那时候还找不到这个空间，这里补一次
+                if (pendingSpace && !panel.hidden) focusSpaceEditor(pendingSpace);
             });
         }
     }

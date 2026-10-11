@@ -159,6 +159,7 @@ POST /content            { section, content }  写单个区块
     {
       "name": "我的摄影",
       "slug": "photos",
+      "externalUrl": "",
       "blocks": [
         { "type": "text",  "value": "一段文字，最多 2000 字" },
         { "type": "image", "url": "https://…/photo.png", "alt": "显示在图下方的说明" }
@@ -169,6 +170,10 @@ POST /content            { section, content }  写单个区块
 ```
 
 图片不塞进这个 JSON——base64 会让体积膨胀三分之一，内容文件迟早被撑爆，页面加载跟着变慢。
+
+`externalUrl` 是给「别人的站点」留的：填了之后首页格子上点一下就直接跳到那个网址
+（新标签页 + `noopener`），格子上会显示目标域名。适合放自己的其他 web 作品，或者你欣赏的站点。
+服务端只放行 http(s)——它会渲染成 `href`，不卡死的话 `javascript:` 就能被点起来。
 
 ### 空间的两种网址
 

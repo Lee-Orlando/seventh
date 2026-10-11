@@ -73,6 +73,17 @@
         </div>
     </noscript>
 
+    <!-- 管理入口：空间详情页本身不承担编辑——整站只有一个编辑器，在首页右侧抽屉里。
+         这里只负责把人送过去，并带上当前空间的短名，好让首页直接定位到那一条。
+         默认 href 指向 index.html#edit，没 JS 时也能进管理面板（只是定位不到具体空间）。 -->
+    <a class="admin-fab" href="index.html#edit" id="adminFab">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+        </svg>
+        <span>编辑这个空间</span>
+    </a>
+
     <script src="site.config.js" defer></script>
     <script src="js/space.js" defer></script>
 </body>

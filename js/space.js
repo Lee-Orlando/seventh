@@ -133,9 +133,23 @@
         }
     }
 
+    /**
+     * 把「编辑这个空间」的入口指向首页的编辑面板，并带上短名，
+     * 这样首页一打开就自动打开抽屉、切到空间标签、并把这一条滚到眼前。
+     */
+    function wireEditLink(slug) {
+        const fab = document.getElementById('adminFab');
+        if (!fab || !slug) return;
+        fab.href = `index.html?space=${encodeURIComponent(slug)}#edit`;
+    }
+
     async function load() {
         const yearTag = document.getElementById('copyright-year');
         if (yearTag) yearTag.textContent = String(new Date().getFullYear());
+
+        // 地址栏里写了哪个空间，编辑入口就跟着它走——链接先配好，
+        // 万一后面云端取失败，至少点管理还能回到首页
+        wireEditLink(slugify(requestedSlug()));
 
         const url = endpoint();
         if (!url) {
